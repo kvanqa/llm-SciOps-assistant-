@@ -1,0 +1,17 @@
+# Real operational documents — never commit these
+docs/*
+!docs/.gitkeep
+data/*
+!data/.gitkeep
+data/vector_store/*
+!data/vector_store/.gitkeep
+
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+.env
+*.faiss
+*.pkl
+.DS_Store

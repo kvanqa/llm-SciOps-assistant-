@@ -4,11 +4,11 @@ mode: retrieval   # retrieval | local_llm | api_llm
                     # See README "Data governance" before changing from retrieval.
 
 chunking:
-  chunk_size: 800       # characters per chunk
+  chunk_size: 400       # characters per chunk
   chunk_overlap: 150
 
 retrieval:
-  top_k: 5
+  top_k: 2
   embedding_backend: auto   # auto | sentence_transformers | tfidf
   embedding_model: all-MiniLM-L6-v2   # used if sentence_transformers available
 

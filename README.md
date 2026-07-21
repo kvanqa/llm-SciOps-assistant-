@@ -45,7 +45,7 @@ pip install -r requirements.txt
 ```bash
 cp example_docs/sample_manual.md docs/
 python scripts/build_index.py
-python -m src.cli
+python src/cli.py
 # try asking: "how often do I need to run a global sync?"
 ```
 
@@ -60,7 +60,7 @@ python scripts/build_index.py
 Then ask questions:
 
 ```bash
-python -m src.cli
+python src/cli.py
 ```
 
 ## Project Structure

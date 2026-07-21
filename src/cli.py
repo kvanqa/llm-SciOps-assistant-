@@ -3,8 +3,8 @@ cli.py
 
 Interactive Q&A loop.
 
-Usage:
-    python -m src.cli
+Usage (run from the project root):
+    python src/cli.py
 """
 
 from rag import RagPipeline
@@ -29,3 +29,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

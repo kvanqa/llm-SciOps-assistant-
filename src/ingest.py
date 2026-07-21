@@ -40,7 +40,19 @@ def _read_docx(path: Path) -> str:
     except ImportError as e:
         raise ImportError("Install python-docx to read .docx files: pip install python-docx") from e
     d = docx.Document(str(path))
-    return "\n\n".join(p.text for p in d.paragraphs)
+
+    parts = [p.text for p in d.paragraphs if p.text.strip()]
+
+    # Paragraphs alone miss table content (e.g. resource/URL tables, contact
+    # lists) — python-docx keeps tables in a separate `d.tables` collection.
+    for table_idx, table in enumerate(d.tables):
+        parts.append(f"\n[Table {table_idx + 1}]")
+        for row in table.rows:
+            cells = [cell.text.strip() for cell in row.cells]
+            if any(cells):
+                parts.append(" | ".join(cells))
+
+    return "\n\n".join(parts)
 
 
 READERS = {
