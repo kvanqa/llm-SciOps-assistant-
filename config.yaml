@@ -1,0 +1,24 @@
+# MeerKAT Ops Assistant config
+
+mode: retrieval   # retrieval | local_llm | api_llm
+                    # See README "Data governance" before changing from retrieval.
+
+chunking:
+  chunk_size: 800       # characters per chunk
+  chunk_overlap: 150
+
+retrieval:
+  top_k: 5
+  embedding_backend: auto   # auto | sentence_transformers | tfidf
+  embedding_model: all-MiniLM-L6-v2   # used if sentence_transformers available
+
+local_llm:
+  provider: ollama
+  model: llama3
+  host: http://localhost:11434
+
+api_llm:
+  # Left blank on purpose. Do not fill in until data governance has signed
+  # off on sending document content to an external API.
+  provider: null
+  model: null
