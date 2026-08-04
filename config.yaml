@@ -1,6 +1,6 @@
 # MeerKAT Ops Assistant config
 
-mode: retrieval   # retrieval | local_llm | api_llm
+mode: local_llm   #retrieval | local_llm | api_llm
                     # See README "Data governance" before changing from retrieval.
 
 chunking:
@@ -9,12 +9,12 @@ chunking:
 
 retrieval:
   top_k: 2
-  embedding_backend: auto   # auto | sentence_transformers | tfidf
-  embedding_model: all-MiniLM-L6-v2   # used if sentence_transformers available
+  embedding_backend: ollama   # auto | sentence_transformers | tfidf
+  embedding_model: nomic-embed-text #all-MiniLM-L6-v2   # used if sentence_transformers available
 
 local_llm:
   provider: ollama
-  model: llama3
+  model: llama3.2
   host: http://localhost:11434
 
 api_llm:
