@@ -68,16 +68,89 @@ def _read_txt_or_md(path: Path) -> str:
     return "\n".join(out)
 
 
+# def _read_pdf(path: Path) -> str:
+#     try:
+#         from pypdf import PdfReader
+#     except ImportError as e:
+#         raise ImportError("Install pypdf to read PDF files: pip install pypdf") from e
+#     reader = PdfReader(str(path))
+#     # No reliable structural heading info from plain PDF text extraction —
+#     # headings simply won't be tracked for PDFs. Worth knowing as a
+#     # limitation rather than guessing at font-size heuristics.
+#     return "\n\n".join(page.extract_text() or "" for page in reader.pages)
+
 def _read_pdf(path: Path) -> str:
     try:
-        from pypdf import PdfReader
+        import pdfplumber
     except ImportError as e:
-        raise ImportError("Install pypdf to read PDF files: pip install pypdf") from e
-    reader = PdfReader(str(path))
-    # No reliable structural heading info from plain PDF text extraction —
-    # headings simply won't be tracked for PDFs. Worth knowing as a
-    # limitation rather than guessing at font-size heuristics.
-    return "\n\n".join(page.extract_text() or "" for page in reader.pages)
+        raise ImportError("Install pdfplumber to read PDF files with clean table structures: pip install pdfplumber") from e
+    
+    output_pages = []
+    
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages:
+            # 1. Extract the primary text layout of the page
+            page_text = page.extract_text() or ""
+            
+            # 2. Extract tables and format them cleanly as Markdown-style strings
+            tables = page.find_tables()
+            if tables:
+                for table in tables:
+                    raw_table_data = table.extract()
+                    if raw_table_data:
+                        # Convert the rows of data into a Markdown table layout
+                        md_table = []
+                        for i, row in enumerate(raw_table_data):
+                            # Clean up None values or linebreaks inside cells
+                            clean_row = [str(cell).replace('\n', ' ').strip() if cell is not None else "" for cell in row]
+                            md_table.append("| " + " | ".join(clean_row) + " |")
+                            
+                            # Add the standard Markdown header separator line after the first row
+                            if i == 0:
+                                md_table.append("|" + "---| " * len(clean_row))
+                        
+                        # Stitch the Markdown table back into the text block
+                        # You can also use a string replacement rule if you want to swap it inline,
+                        # but appending it ensures the table content is intact inside the chunk.
+                        page_text += "\n\n### Extracted Table Data:\n" + "\n".join(md_table)
+            
+            output_pages.append(page_text)
+            
+    return "\n\n".join(output_pages)
+
+# def _read_pdf(path: Path) -> str:
+#     '''pip uninstall torch torchaudio -y
+# pip install torch torchvision torchaudio --index-url https://pytorch.org  # Change cu124 to your CUDA version
+# '''
+#     try:
+#         from docling.document_converter import DocumentConverter
+#         from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
+#         from docling.datamodel.pipeline_options import ThreadedPdfPipelineOptions
+#     except ImportError as e:
+#         raise ImportError("Install docling to use advanced layout extraction: pip install docling") from e
+    
+#     # Explicitly configure Docling to leverage your server's NVIDIA GPU via CUDA
+#     acc_options = AcceleratorOptions(device=AcceleratorDevice.CUDA)
+    
+#     # Optimise batch sizes for GPU memory to speed up table and layout detection
+#     pipeline_options = ThreadedPdfPipelineOptions(
+#         ocr_batch_size=32,
+#         layout_batch_size=32,
+#         table_batch_size=4
+#     )
+    
+#     # Initialize the converter with GPU settings
+#     converter = DocumentConverter(
+#         accelerator_options=acc_options,
+#         pipeline_options=pipeline_options
+#     )
+    
+#     # Run the AI parsing pipeline
+#     result = converter.convert(path)
+    
+#     # Export the entire document directly as a highly structured Markdown string
+#     return result.document.export_to_markdown()
+
 
 
 def _read_docx(path: Path) -> str:
@@ -206,4 +279,3 @@ if __name__ == "__main__":
         print(f"--- {c.source} [{c.heading}] chunk {c.chunk_index} ---")
         print(c.text[:200], "...\n")
 
-        
