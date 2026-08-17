@@ -1,23 +1,8 @@
-"""
-llm_provider.py
-
-Pluggable answer-generation backend. The default is retrieval-only — no LLM
-call, just the ranked passages. This keeps everything local and safe to use
-before any data-governance sign-off. Two opt-in backends exist for later:
-
-- local_llm: calls a locally-running Ollama model. Nothing leaves the machine.
-- api_llm: calls an external API. Intentionally requires an explicit,
-  non-default config change plus filling in real provider/model values —
-  see config.yaml and the README's "Data governance" section before using.
-"""
-
 from typing import List
 from vector_store import SearchResult
 
 
 class RetrievalOnlyProvider:
-    """No generation — just formats the retrieved passages with citations."""
-
     def answer(self, question: str, results: List[SearchResult]) -> str:
         if not results:
             return "No relevant passages found in the indexed documents."
@@ -29,11 +14,23 @@ class RetrievalOnlyProvider:
 
 
 class OllamaProvider:
-    """Local generation via Ollama. Requires `ollama serve` running locally."""
+    """
+    Local generation via Ollama. Requires `ollama serve` running locally.
 
-    def __init__(self, model: str = "llama3", host: str = "http://localhost:11434"):
+    temperature defaults low (0.1) rather than Ollama's usual chat default
+    (~0.7-0.8). For grounded factual QA over retrieved documents, a high
+    temperature increases the chance the model wanders from the actual
+    retrieved text and fills gaps with plausible-sounding invention —
+    exactly the failure mode that produced the fabricated SKARAB acronym
+    expansion. Low temperature trades away creative phrasing (not needed
+    here) for staying closer to the source material (needed here).
+    """
+
+    def __init__(self, model: str = "llama3", host: str = "http://localhost:11434",
+                 temperature: float = 0.1):
         self.model = model
         self.host = host
+        self.temperature = temperature
 
     def answer(self, question: str, results: List[SearchResult]) -> str:
         import requests
@@ -50,7 +47,12 @@ class OllamaProvider:
         )
         resp = requests.post(
             f"{self.host}/api/generate",
-            json={"model": self.model, "prompt": prompt, "stream": False},
+            json={
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": self.temperature},
+            },
             timeout=120,
         )
         resp.raise_for_status()
@@ -58,13 +60,7 @@ class OllamaProvider:
 
 
 class ApiLlmProvider:
-    """
-    External API generation. Disabled unless explicitly configured.
-    Do not point this at any provider until data governance has confirmed
-    that document content may leave the local machine.
-    """
-
-    def __init__(self, provider: str | None, model: str | None):
+    def __init__(self, provider: str = None, model: str = None):
         if not provider or not model:
             raise ValueError(
                 "api_llm mode requires provider/model to be set in config.yaml, "
@@ -85,7 +81,11 @@ def build_provider(mode: str, config: dict):
         return RetrievalOnlyProvider()
     if mode == "local_llm":
         cfg = config.get("local_llm", {})
-        return OllamaProvider(model=cfg.get("model", "llama3"), host=cfg.get("host", "http://localhost:11434"))
+        return OllamaProvider(
+            model=cfg.get("model", "llama3"),
+            host=cfg.get("host", "http://localhost:11434"),
+            temperature=cfg.get("temperature", 0.1),
+        )
     if mode == "api_llm":
         cfg = config.get("api_llm", {})
         return ApiLlmProvider(cfg.get("provider"), cfg.get("model"))

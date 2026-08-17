@@ -1,10 +1,13 @@
 pyyaml>=6.0
 numpy>=1.26
+pandas >=2.3.3
 scikit-learn>=1.4
 pypdf>=4.0
 python-docx>=1.1
 markdown-it-py>=3.0
-
+pdfplumber>=0.11.10
+streamlit>=1.61.1
+sentence-transformers>=2.7
 # Optional (better semantic search — install if you want it and it's
 # cleared under your data governance check; runs fully locally either way):
 # sentence-transformers>=2.7
