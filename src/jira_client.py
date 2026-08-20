@@ -1,15 +1,18 @@
 """
 jira_client.py
 
-Fetches Jira tickets for citing in handover notes / weekly summaries.
+Fetches tickets created within a specific shift window (for handover
+citation).
 
-Two modes:
-- mock (default): returns canned dummy tickets from a local fixture file,
-  no network calls at all. Use this to build and test everything before
-  Jira access + data governance are sorted out.
-- live: queries a real Jira instance via REST API. Requires JIRA_BASE_URL,
-  JIRA_EMAIL, JIRA_API_TOKEN (a Jira API token, not your password) set as
-  environment variables — see .env.example. Never commit real credentials.
+IMPORTANT — API migration (fixed after hitting this live):
+Atlassian permanently removed GET /rest/api/3/search (returns 410 Gone,
+fully shut down by end of October 2025). The replacement is
+GET /rest/api/3/search/jql, which also changed the pagination model:
+no more startAt/total — instead each response returns a nextPageToken
+(opaque string) and an isLast boolean. Critically, nextPageToken must be
+OMITTED ENTIRELY on the first request — passing it as null/empty causes
+an "invalid or expired token" error. Only include it once you have a
+real token from a previous response.
 """
 
 from dataclasses import dataclass
@@ -28,19 +31,29 @@ class Ticket:
     summary: str
     status: str
     created: str
+    description: str = ""
+    reporter: str = ""
+    comments: List[str] = None  # <-- 1. Add this slot (default to None)
     url: str = ""
 
-    def cite(self) -> str:
-        """Short citation form for embedding in a handover note, e.g. [OPS-6338]."""
-        return f"[{self.key}]"
+
+    def __post_init__(self):
+        if self.comments is None:
+            self.comments = []
 
     def line(self) -> str:
-        return f"{self.key} ({self.status}): {self.summary}"
+        # Format the comments into a clean list for Llama 3.2
+        formatted_comments = "\n".join([f"    - Comment: {c}" for c in self.comments]) if self.comments else "    - No comments logged yet."
+        
+        return (f"{self.key} ({self.status}) | Reporter: {self.reporter}\n"
+                f"  Summary: {self.summary}\n"
+                f"  Description: {self.description}\n"
+                f"  Activity History:\n{formatted_comments}\n")
+    def cite(self) -> str:
+        return f"[{self.key}]"
 
 
 class MockJiraClient:
-    """Returns canned tickets from a local JSON fixture. No network calls."""
-
     def __init__(self, fixture_path: Path = FIXTURE_PATH):
         self.fixture_path = fixture_path
 
@@ -57,8 +70,6 @@ class MockJiraClient:
 
 
 class LiveJiraClient:
-    """Queries a real Jira Cloud instance. Requires credentials as env vars."""
-
     def __init__(self, base_url: Optional[str] = None, email: Optional[str] = None,
                  api_token: Optional[str] = None):
         self.base_url = base_url or os.environ.get("JIRA_BASE_URL")
@@ -67,14 +78,34 @@ class LiveJiraClient:
         if not all([self.base_url, self.email, self.api_token]):
             raise ValueError(
                 "Live Jira mode requires JIRA_BASE_URL, JIRA_EMAIL, and "
-                "JIRA_API_TOKEN set as environment variables. See .env.example. "
-                "Do not enable live mode until this is cleared for your data."
+                "JIRA_API_TOKEN set as environment variables."
             )
 
-    def fetch_tickets(self, since: Optional[datetime] = None, project_key: Optional[str] = None,
-                       reporter: Optional[str] = None) -> List[Ticket]:
+    def _fetch_page(self, jql: str, page_size: int, next_page_token: Optional[str],
+                     fields: str) -> dict:
         import requests
+        params = {
+            "jql": jql,
+            "maxResults": page_size,
+            "fields": fields,
+        }
+        # Deliberately omit nextPageToken entirely on the first request —
+        # passing it as null/empty causes "invalid or expired token".
+        if next_page_token is not None:
+            params["nextPageToken"] = next_page_token
 
+        resp = requests.get(
+            f"{self.base_url}/rest/api/3/search/jql",
+            params=params,
+            auth=(self.email, self.api_token),
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def fetch_tickets(self, since: Optional[datetime] = None, project_key: Optional[str] = None,
+                       reporter: Optional[str] = None, max_results: int = 1000,
+                       page_size: int = 50) -> List[Ticket]:
         jql_parts = []
         if project_key:
             jql_parts.append(f'project = "{project_key}"')
@@ -84,24 +115,32 @@ class LiveJiraClient:
             jql_parts.append(f'created >= "{since.strftime("%Y-%m-%d %H:%M")}"')
         jql = " AND ".join(jql_parts) if jql_parts else "created >= -1d"
 
-        resp = requests.get(
-            f"{self.base_url}/rest/api/3/search",
-            params={"jql": jql, "fields": "summary,status,created"},
-            auth=(self.email, self.api_token),
-            timeout=30,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return [
-            Ticket(
-                key=issue["key"],
-                summary=issue["fields"]["summary"],
-                status=issue["fields"]["status"]["name"],
-                created=issue["fields"]["created"],
-                url=f"{self.base_url}/browse/{issue['key']}",
-            )
-            for issue in data.get("issues", [])
-        ]
+        tickets: List[Ticket] = []
+        next_page_token: Optional[str] = None
+
+        while len(tickets) < max_results:
+            data = self._fetch_page(jql, page_size, next_page_token, fields="summary,status,created")
+            issues = data.get("issues", [])
+            if not issues:
+                break
+
+            for issue in issues:
+                fields = issue.get("fields", {})
+                tickets.append(Ticket(
+                    key=issue["key"],
+                    summary=fields.get("summary", ""),
+                    status=(fields.get("status") or {}).get("name", ""),
+                    created=fields.get("created", ""),
+                    url=f"{self.base_url}/browse/{issue['key']}",
+                ))
+
+            if data.get("isLast", True):
+                break
+            next_page_token = data.get("nextPageToken")
+            if not next_page_token:
+                break  # defensive: isLast was false but no token given, stop rather than loop forever
+
+        return tickets[:max_results]
 
 
 def build_jira_client(mode: str = "mock", **kwargs):
@@ -110,3 +149,5 @@ def build_jira_client(mode: str = "mock", **kwargs):
     if mode == "live":
         return LiveJiraClient(**kwargs)
     raise ValueError(f"Unknown jira mode: {mode}")
+
+

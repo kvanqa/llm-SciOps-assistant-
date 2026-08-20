@@ -1,4 +1,7 @@
 import streamlit as st
+import requests
+# 1. IMPORT YOUR JIRA CLIENT CODE
+from jira_client import build_jira_client
 
 # Import your exact pipeline class from the src folder
 from rag import RagPipeline
@@ -6,17 +9,19 @@ import chat_sessions as cs
 
 # Set up the browser tab title and layouts
 st.set_page_config(page_title="SKAO RAG Assistant tool", page_icon="🔭")
-
+st.title("MeerKAT SciOps Tier-2 Assistant")
 
 # Cache the pipeline instantiation so it only runs ONCE when the server starts.
 # This prevents the app from re-loading models every time someone clicks a button.
-@st.cache_resource
-def load_pipeline():
-    return RagPipeline()
+# @st.cache_resource
+# def load_pipeline():
+#     return RagPipeline()
 
 
-pipeline = load_pipeline()
-
+pipeline = RagPipeline()
+# Initialize the live Jira client (reads env variables automatically)
+# Change to mode="mock" if you want to test with dummy JSON files locally
+jira = build_jira_client(mode="live")
 # --- Sidebar: chat list, new chat, rename/delete for the active chat ---
 
 st.sidebar.title("Chats")
@@ -85,9 +90,21 @@ if question := st.chat_input("Ask about an error log, system manual step, or JIR
         st.markdown(question)
     cs.append_message(current.id, "user", question)
 
-    # 2. Feed the question into your exact pipeline and display a loading spinner
+        # 2. Feed the question into your exact pipeline and display a loading spinner
     with st.spinner("Analyzing documentation and generating response..."):
-        response = pipeline.ask(question)
+        # Fetch tickets from the last 24 hours for the OPS project
+        from datetime import datetime, timedelta
+        tickets = jira.fetch_tickets(since=datetime.now() - timedelta(days=1), project_key="OPS")
+        
+        # Inject the live tickets into the question text so the pipeline sees them
+        jira_context = "\n".join([t.line() for t in tickets]) if tickets else "No active tickets found."
+        enriched_question = f"{question}\n\n[Live Jira Context]:\n{jira_context}"
+        
+        response = pipeline.ask(enriched_question)
+
+    # # 2. Feed the question into your exact pipeline and display a loading spinner
+    # with st.spinner("Analyzing documentation and generating response..."):
+    #     response = pipeline.ask(question)
 
     # 3. Display the response, and persist it too
     with st.chat_message("assistant"):
