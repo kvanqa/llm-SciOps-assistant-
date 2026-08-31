@@ -56,3 +56,31 @@ Logs
 "What is the command to grep proxy logs for antenna m006 for the date 2023-03-11?"
 Why this tests RAG: This tests the model's ability to extract specific examples provided in the "Logs On Portal" section.
 Debugging Tip: If your RAG system is failing these, check your chunking strategy. If the code blocks are being split across different chunks, the model will likely struggle to provide the full command sequence or context. You might need to ensure that your chunker keeps "procedure" headings and their associated code blocks together.
+
+What is the purpose of the Gain Adjustment block?
+This will help you understand that it is used to down-weight the spectrum between 925 - 960 MHz for intensity mapping.
+When should the Gain Adjustment block be executed in relation to other blocks?
+This will clarify that it must be run after the delaycal and before the intensity mapping (MS-01) blocks.
+What are the specific gain settings mentioned for the F-engine?
+This will extract the values: the default gain is 2176, while the adjusted gain is 217.
+What command or script is used to configure this observation?
+This will prompt the retrieval of the Python code snippet provided in the document.
+What channels are being affected by the gain adjustment?
+This will highlight the information from the log: channels 2869 to 3133.
+
+
+python3 -c "from vector_store import load_index, INDEX_PATH backend = load_index(INDEX_PATH) print('Active backend:', backend.name)"
+
+
+
+ATATT3xFfGF0uYIQDPAk7u_jQgKF200Gxty1i4bicrnsWr4_uO3L2KHX1esyrbl4Bbdgldml3B24br0OmrYCj-TnZGOOfv9njUt0PGOQ5xuyoAok1a_nkf9LVP8L5pa8HAgvEDpE4GwcVDorqpybZwMwZzea0qr3MJCHA_HmdkCHeqwaI7o9zb4=2FED3B62"
+
+# QUICK SCRPTS RUN: 
+streamlit run src/app.py
+ollama serve
+    - ollama run qwen3:14b
+configuring JIRA API in the llm env
+    - export JIRA_BASE_URL="https://skaafrica.atlassian.net"
+    - export JIRA_EMAIL="kvanqa@sarao.ac.za"
+    - export JIRA_API_TOKEN=" " 
+

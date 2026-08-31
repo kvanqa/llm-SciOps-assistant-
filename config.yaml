@@ -14,7 +14,7 @@ retrieval:
 # also want to add temperature = 0.1
 local_llm:
   provider: ollama
-  model: llama3.2
+  model: qwen3:14b #llama3.2
   host: http://localhost:11434
   temperature: 0.1
 

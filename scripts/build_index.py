@@ -33,6 +33,8 @@ def main():
     # Define paths to your separated subfolders
     ops_dir = Path(DOCS_DIR) / "ops"
     icd_dir = Path(DOCS_DIR) / "icd"
+    # print the number and the names of docs found in ops
+    print(f"Found {len(list(ops_dir.glob('*.docx')))} operations docs: {[p.name for p in ops_dir.glob('*.docx')]}")
     #retrieval_cfg = config.get("retrieval", {})
 
     # Initialize your new ChromaDB backend manager

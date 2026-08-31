@@ -8,14 +8,14 @@ Usage (run from the project root):
 """
 
 from rag import RagPipeline
-
+from jira_client import build_jira_client
 
 def main():
     print("MeerKAT Ops Assistant — Tier 1 (RAG Q&A)")
     print("Type a question, or 'quit' to exit.\n")
 
     pipeline = RagPipeline()
-
+    jira = build_jira_client(mode="live")
     while True:
         question = input("> ").strip()
         if question.lower() in ("quit", "exit"):
@@ -24,6 +24,7 @@ def main():
             continue
         print()
         print(pipeline.ask(question))
+        jira.fetch_tickets()
         print()
 
 

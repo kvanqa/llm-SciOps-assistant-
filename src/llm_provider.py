@@ -26,7 +26,7 @@ class OllamaProvider:
     here) for staying closer to the source material (needed here).
     """
 
-    def __init__(self, model: str = "llama3", host: str = "http://localhost:11434",
+    def __init__(self, model: str = "qwen3:14b", host: str = "http://localhost:11434",
                  temperature: float = 0.1):
         self.model = model
         self.host = host
@@ -82,7 +82,7 @@ def build_provider(mode: str, config: dict):
     if mode == "local_llm":
         cfg = config.get("local_llm", {})
         return OllamaProvider(
-            model=cfg.get("model", "llama3"),
+            model=cfg.get("model", "qwen3:14b"),
             host=cfg.get("host", "http://localhost:11434"),
             temperature=cfg.get("temperature", 0.1),
         )

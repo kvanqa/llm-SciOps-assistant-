@@ -13,7 +13,7 @@ class OllamaEmbeddingFunction(chromadb.EmbeddingFunction):
             response = requests.post(
                 self.base_url, 
                 json={"model": self.model_name, "prompt": text},
-                timeout=10
+                timeout=60
             )
             response.raise_for_status()
             return response.json()["embedding"]
